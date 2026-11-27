@@ -26,7 +26,7 @@ miav version
 python -m pytest
 python -m ruff check .
 python -m ruff format --check .
-python -m mypy agent
+python -m mypy agent engine
 ```
 
 To format code, run `python -m ruff format .`. The tests load project

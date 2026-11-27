@@ -20,7 +20,7 @@ dev = [
 miav = "agent.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["agent", "agent.*"]
+include = ["agent", "agent.*", "engine", "engine.*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -35,4 +35,4 @@ select = ["E", "F", "I"]
 [tool.mypy]
 python_version = "3.11"
 strict = true
-files = ["agent"]
+files = ["agent", "engine"]

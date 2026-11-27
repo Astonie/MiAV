@@ -3,9 +3,9 @@
 Status: accepted for the initial development foundation.
 
 The top-level `agent` package contains the CLI and platform identification.
-Only `agent` is packaged now; other top-level component directories are
-reserved for future milestones and are not Python packages or functioning
-services. Empty directories use `.gitkeep` so Git preserves the agreed
+`agent` and the heuristic `engine` package are packaged now; other top-level
+component directories are reserved for future milestones and are not
+functioning services. Empty directories use `.gitkeep` so Git preserves the agreed
 boundaries. Modules and platform interfaces will be introduced when real
 implementations require them, avoiding placeholder protection APIs.
 

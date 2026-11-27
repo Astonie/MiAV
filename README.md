@@ -7,15 +7,17 @@ individuals and centrally managed enterprises.
 
 ## Status and capabilities
 
-This repository currently provides development infrastructure, a version-only
-CLI and basic operating-system identification. **It does not scan or protect
-endpoints.** Signature and YARA detection, heuristics, machine learning,
-behavioural monitoring, ransomware detection, quarantine, reporting and central
-management are planned, not implemented.
+This repository provides an experimental on-demand file scanner with streaming
+SHA-256, basic explainable heuristics and JSON reports. It does not provide
+comprehensive antivirus or real-time endpoint protection. Signature and YARA
+detection, machine learning, behavioural monitoring, ransomware detection,
+quarantine and central management are planned, not implemented.
 
 Windows 10 and 11 are the initial endpoint targets; Linux and macOS are future
 targets. The foundation is intended to be portable, but no operating system
-currently has an implemented protection capability.
+currently has real-time protection. The scanner has been tested on macOS and
+fails closed on Windows until safe native file handling is implemented; Linux
+has not yet been validated.
 
 ## Architecture and technology
 
@@ -43,13 +45,17 @@ miav version
 python -m pytest
 python -m ruff check .
 python -m ruff format --check .
-python -m mypy agent
+python -m mypy agent engine
 ```
 
-See the [development guide](docs/development/development-guide.md) for setup,
-testing and Git workflow. Future commands include `miav scan <path>`,
-`miav scan <path> --recursive`, `miav quarantine list`, and
-`miav report --latest`; these commands are not implemented.
+For example, run `miav scan /path/to/file` or
+`miav scan /path/to/directory --recursive --format json`. A `CLEAN` result
+only means the limited heuristics found nothing; it does not prove a file safe.
+See the [scanning guide](docs/development/core-scanning-engine.md) for options,
+exit codes, security boundaries and limitations, and the
+[development guide](docs/development/development-guide.md) for setup and
+testing. Quarantine and
+`miav report --latest` remain unimplemented.
 
 ## Contributing
 

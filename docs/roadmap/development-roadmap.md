@@ -1,6 +1,6 @@
 # Development roadmap
 
-All milestones are planned, except the current foundation. Tests and security
+The foundation is complete and M1 scanning is in progress. Tests and security
 review are part of each milestone; thresholds below are acceptance gates, not
 claims about current performance.
 

@@ -17,7 +17,7 @@ def test_cli_version() -> None:
 
 def test_cli_rejects_unimplemented_command() -> None:
     result = subprocess.run(
-        [sys.executable, "-m", "agent", "scan", "sample"],
+        [sys.executable, "-m", "agent", "quarantine", "list"],
         capture_output=True,
         text=True,
         check=False,

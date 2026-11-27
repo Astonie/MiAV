@@ -3,9 +3,11 @@
 ## Status and scope
 
 This document describes a target architecture, not implemented protection.
-The current foundation contains only package configuration, a version command
-and operating-system identification. Components and connections below are
-planned; no management infrastructure is deployed.
+The current implementation includes an experimental on-demand scanner, basic
+heuristics and JSON reporting. Management infrastructure and real-time
+protection are not deployed. See the
+[scanning guide](../development/core-scanning-engine.md) for implemented
+capabilities and limitations.
 
 ```mermaid
 flowchart LR
