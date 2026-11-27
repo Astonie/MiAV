@@ -17,7 +17,8 @@ Windows 10 and 11 are the initial endpoint targets; Linux and macOS are future
 targets. The foundation is intended to be portable, but no operating system
 currently has real-time protection. The scanner has been tested on macOS and
 fails closed on Windows until safe native file handling is implemented; Linux
-has not yet been validated.
+has not yet been validated. Windows, Linux and macOS CI is configured but
+has not yet run; the Windows job tests fail-closed behavior, not scanning.
 
 ## Architecture and technology
 
@@ -54,7 +55,8 @@ only means the limited heuristics found nothing; it does not prove a file safe.
 See the [scanning guide](docs/development/core-scanning-engine.md) for options,
 exit codes, security boundaries and limitations, and the
 [development guide](docs/development/development-guide.md) for setup and
-testing. Quarantine and
+testing. The [platform security guide](docs/security/platform-filesystem-security.md)
+describes the Windows blocker and validation status. Quarantine and
 `miav report --latest` remain unimplemented.
 
 ## Contributing

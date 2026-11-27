@@ -2,6 +2,7 @@
 
 import json
 import logging
+import math
 import os
 import stat
 import time
@@ -21,6 +22,10 @@ LOGGER = logging.getLogger("miav.scan")
 
 class ScanLimitReached(Exception):
     """The configured traversal limit was reached."""
+
+
+class ScanTimedOut(Exception):
+    """The configured scan deadline was reached."""
 
 
 def _event(event: str, **fields: object) -> None:
@@ -77,6 +82,8 @@ class ScanOptions:
     max_file_size: int = 256 * 1024 * 1024
     suspicious_threshold: int = 1
     max_entries: int = 100_000
+    max_depth: int = 128
+    timeout_seconds: float = 3600.0
 
     def __post_init__(self) -> None:
         if not 1 <= self.chunk_size <= 16 * 1024 * 1024:
@@ -87,6 +94,10 @@ class ScanOptions:
             raise ValueError("suspicious threshold must be positive")
         if self.max_entries < 1:
             raise ValueError("maximum entry count must be positive")
+        if not 0 <= self.max_depth <= 128:
+            raise ValueError("maximum depth must be between 0 and 128")
+        if not math.isfinite(self.timeout_seconds) or self.timeout_seconds <= 0:
+            raise ValueError("timeout must be a positive finite number of seconds")
 
 
 def scan(
@@ -103,6 +114,11 @@ def scan(
     seen: set[tuple[int, int]] = set()
     entries_seen = 0
     _event("scan_started", scan_id=report.scan_id)
+
+    def should_cancel() -> bool:
+        if time.monotonic() - start >= options.timeout_seconds:
+            raise ScanTimedOut()
+        return cancelled()
 
     def issue(message: str, location: Path = path) -> None:
         report.issues.append({"path": str(location), "error": message})
@@ -131,6 +147,36 @@ def scan(
             indicators=[finding.indicator for finding in result.detections],
         )
         progress(report.total_files_discovered)
+
+    def skip_entry(name: str, display: Path, info: os.stat_result) -> None:
+        report.total_files_discovered += 1
+        reason = (
+            "Symbolic link is not followed"
+            if stat.S_ISLNK(info.st_mode)
+            else "Unsupported filesystem object"
+        )
+        add_result(
+            DetectionResult(
+                report.scan_id,
+                {
+                    "name": name,
+                    "path": str(display),
+                    "extension": display.suffix.lower(),
+                    "size": info.st_size,
+                    "sha256": None,
+                    "mime_type": None,
+                    "format": None,
+                    "created_at": None,
+                    "modified_at": None,
+                },
+                "UNKNOWN",
+                0,
+                [],
+                "skipped",
+                _now(),
+                error=reason,
+            )
+        )
 
     def file_scan(
         parent: int, name: str, display: Path, initial: os.stat_result
@@ -192,7 +238,7 @@ def scan(
                 fd,
                 chunk_size=options.chunk_size,
                 max_size=options.max_file_size,
-                cancelled=cancelled,
+                cancelled=should_cancel,
             )
             after = os.fstat(fd)
             current = os.stat(name, dir_fd=parent, follow_symlinks=False)
@@ -216,11 +262,11 @@ def scan(
             result.risk_score = sum(f.score for f in findings)
             result.detections = findings
             result.scan_status = "completed"
-        except ScanCancelled:
+        except (ScanCancelled, ScanTimedOut) as exc:
             result.classification, result.scan_status, result.error = (
                 "UNKNOWN",
                 "skipped",
-                "Scan cancelled",
+                "Scan timed out" if isinstance(exc, ScanTimedOut) else "Scan cancelled",
             )
             add_result(result)
             raise
@@ -241,14 +287,14 @@ def scan(
                 os.close(fd)
         add_result(result)
 
-    def walk(directory_fd: int, display: Path) -> None:
+    def walk(directory_fd: int, display: Path, depth: int) -> None:
         nonlocal entries_seen
-        if cancelled():
+        if should_cancel():
             raise ScanCancelled()
         try:
             with os.scandir(directory_fd) as entries:
                 for entry in entries:
-                    if cancelled():
+                    if should_cancel():
                         raise ScanCancelled()
                     if entries_seen >= options.max_entries:
                         issue("Maximum directory entry count reached", display)
@@ -260,6 +306,9 @@ def scan(
                         if stat.S_ISREG(info.st_mode):
                             file_scan(directory_fd, entry.name, child, info)
                         elif stat.S_ISDIR(info.st_mode) and options.recursive:
+                            if depth >= options.max_depth:
+                                issue("Maximum directory depth reached", child)
+                                continue
                             child_fd = os.open(
                                 entry.name,
                                 os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
@@ -272,13 +321,11 @@ def scan(
                                     opened.st_ino,
                                 ):
                                     raise OSError("Directory changed before traversal")
-                                walk(child_fd, child)
+                                walk(child_fd, child, depth + 1)
                             finally:
                                 os.close(child_fd)
                         elif not stat.S_ISDIR(info.st_mode):
-                            report.total_files_discovered += 1
-                            report.files_skipped += 1
-                            progress(report.total_files_discovered)
+                            skip_entry(entry.name, child, info)
                     except OSError as exc:
                         issue(
                             f"Entry could not be processed: {type(exc).__name__}: "
@@ -313,13 +360,11 @@ def scan(
                         opened_root.st_ino,
                     ):
                         raise OSError("Directory changed before traversal")
-                    walk(root_fd, path)
+                    walk(root_fd, path, 0)
                 finally:
                     os.close(root_fd)
             else:
-                issue(
-                    "Target is not a regular file or directory (links are not followed)"
-                )
+                skip_entry(name, path, initial)
         finally:
             os.close(parent)
         report.status = (
@@ -329,6 +374,8 @@ def scan(
         )
     except ScanCancelled:
         report.status = "cancelled"
+    except ScanTimedOut:
+        report.status = "timed_out"
     except ScanLimitReached:
         report.status = "partial"
     except (OSError, ValueError) as exc:

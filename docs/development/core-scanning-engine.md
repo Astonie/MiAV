@@ -56,14 +56,19 @@ write failure. Reports contain absolute file paths and may contain sensitive
 metadata: protect and share them appropriately.
 
 Defaults are a 1 MiB chunk, 256 MiB maximum file size, 100,000 directory
-entries, suspicious score threshold 1 and one worker. Override with
-`--chunk-size`, `--max-file-size`, `--max-entries` and
+entries, 128 directory levels, a 3600-second cooperative deadline, suspicious
+score threshold 1 and one worker. Override with
+`--chunk-size`, `--max-file-size`, `--max-entries`, `--max-depth`,
+`--timeout-seconds` and
 `--suspicious-threshold`. The entry limit includes directories and links and
-marks the report partial if reached. Ctrl-C requests cancellation between reads and
-directory entries; a blocked operating-system operation may delay it.
+marks the report partial if reached. The maximum configurable depth is 128;
+depth 0 scans only the root directory's immediate files. Ctrl-C and the deadline
+are checked between reads and directory entries; a blocked operating-system
+operation may delay them.
 The exit code is 0 for a completed scan with only clean results, 1 for
 suspicious findings, 2 for failures, skipped or unknown files, and 130 for
-cancellation. Findings below the configured threshold count as unknown.
+cancellation; a timeout returns 2. Findings below the configured threshold
+count as unknown.
 
 ## Reports and security
 
@@ -75,6 +80,9 @@ provides a birth time; modification time is UTC. Files exceeding the limit,
 duplicate hard links and links are skipped. Directory errors are recorded in
 `issues`; their contents cannot be counted. A non-recursive scan does not
 enumerate subdirectories. Partial or cancelled scans are explicitly marked.
+Skipped links and special filesystem objects now appear in `results` with
+`UNKNOWN` classification, `skipped` status and a reason in `error`. This adds
+result entries compared with earlier reports; existing fields are unchanged.
 
 On systems with the necessary descriptor-relative APIs, each path component is
 opened without following symbolic links, regular files are opened read-only,
@@ -96,6 +104,8 @@ in this environment. Results and duplicate-identity tracking are held in memory
 for the full report and bounded by the entry limit, which may still allow
 substantial memory consumption. Traversal errors, depth limits and oversized files produce partial
 reports rather than a protection claim.
+See the [platform security guide](../security/platform-filesystem-security.md)
+for platform policies and validation status.
 
 ## Benchmark
 

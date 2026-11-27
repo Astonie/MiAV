@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased - filesystem security
+
+- Report skipped links and special objects individually as unknown, with reasons.
+- Bound recursive depth and add a cooperative scan timeout.
+- Configure macOS and Linux regression CI and Windows fail-closed tests. The
+  workflows have not yet run; Windows native scanning remains unimplemented.
+
 ## 0.1.0 - Initial Development Foundation (unreleased)
 
 - Added experimental on-demand file and directory scans, streaming SHA-256,

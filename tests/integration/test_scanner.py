@@ -98,6 +98,16 @@ def test_entry_limit_is_partial(tmp_path: Path) -> None:
     assert report.issues[0]["error"] == "Maximum directory entry count reached"
 
 
+def test_directory_depth_limit_is_partial(tmp_path: Path) -> None:
+    (tmp_path / "child").mkdir()
+    (tmp_path / "child" / "file").write_text("outside depth limit")
+    report = scan(tmp_path, ScanOptions(recursive=True, max_depth=0))
+    assert report.status == "partial"
+    assert report.files_successfully_scanned == 0
+    assert report.issues[0]["path"] == str(tmp_path / "child")
+    assert report.issues[0]["error"] == "Maximum directory depth reached"
+
+
 def test_invalid_path_is_reported() -> None:
     report = scan("/invalid\0path")
     assert report.status == "error"

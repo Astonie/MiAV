@@ -65,6 +65,8 @@ def main() -> None:
     )
     scan_parser.add_argument("--suspicious-threshold", type=int, default=1)
     scan_parser.add_argument("--max-entries", type=int, default=100_000)
+    scan_parser.add_argument("--max-depth", type=int, default=128)
+    scan_parser.add_argument("--timeout-seconds", type=float, default=3600.0)
     args = parser.parse_args()
     if args.command == "version":
         print(f"MiAV {version('miav')}")
@@ -76,6 +78,8 @@ def main() -> None:
             args.max_file_size,
             args.suspicious_threshold,
             args.max_entries,
+            args.max_depth,
+            args.timeout_seconds,
         )
     except ValueError as exc:
         scan_parser.error(str(exc))

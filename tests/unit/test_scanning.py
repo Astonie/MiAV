@@ -79,6 +79,11 @@ def test_result_serialization() -> None:
         {"chunk_size": 0},
         {"max_file_size": 0},
         {"suspicious_threshold": 0},
+        {"max_depth": -1},
+        {"max_depth": 129},
+        {"timeout_seconds": 0},
+        {"timeout_seconds": float("inf")},
+        {"timeout_seconds": float("nan")},
     ],
 )
 def test_invalid_options(kwargs: dict[str, int | float]) -> None:

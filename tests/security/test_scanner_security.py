@@ -20,7 +20,59 @@ def test_symlinks_are_not_followed(tmp_path: Path) -> None:
     assert report.status == "partial"
     assert report.files_skipped == 1
     assert report.files_successfully_scanned == 0
+    assert report.results[0].file["path"] == str(root / "link")
+    assert report.results[0].classification == "UNKNOWN"
+    assert report.results[0].scan_status == "skipped"
+    assert "Symbolic link" in str(report.results[0].error)
+    assert scan(root / "link").results[0].classification == "UNKNOWN"
     assert scan(root / "link" / "outside.txt").status == "error"
+
+
+def test_special_object_is_reported_without_opening(tmp_path: Path) -> None:
+    fifo = tmp_path / "fifo"
+    os.mkfifo(fifo)
+    report = scan(tmp_path)
+    assert report.status == "partial"
+    assert report.results[0].classification == "UNKNOWN"
+    assert report.results[0].error == "Unsupported filesystem object"
+
+
+def test_directory_replaced_by_link_is_not_traversed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    child = root / "child"
+    child.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "secret").write_text("outside")
+    original_open = os.open
+    original_parent = scanner.open_parent
+    opened: list[str] = []
+
+    def open_parent_and_install_hook(path: Path) -> tuple[int, str]:
+        parent, name = original_parent(path)
+
+        def guarded_open(
+            name: str, flags: int, mode: int = 0o777, *, dir_fd: int | None = None
+        ) -> int:
+            opened.append(name)
+            if name == "child":
+                child.rename(tmp_path / "moved")
+                child.symlink_to(outside, target_is_directory=True)
+            return original_open(name, flags, mode, dir_fd=dir_fd)
+
+        monkeypatch.setattr(os, "open", guarded_open)
+        return parent, name
+
+    monkeypatch.setattr(scanner, "open_parent", open_parent_and_install_hook)
+    report = scan(root, ScanOptions(recursive=True))
+    assert report.status == "partial"
+    assert report.files_successfully_scanned == 0
+    assert report.issues[0]["path"] == str(child)
+    assert "secret" not in opened
+    assert (outside / "secret").read_text() == "outside"
 
 
 def test_hardlink_deduplication_and_size_limit(tmp_path: Path) -> None:
@@ -92,6 +144,26 @@ def test_cancellation_and_unusual_filename(tmp_path: Path) -> None:
     assert report.files_skipped == 1
 
 
+def test_deadline_during_file_processing_is_not_clean(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "file"
+    path.write_text("test data")
+    now = [0.0]
+    monkeypatch.setattr(scanner.time, "monotonic", lambda: now[0])
+
+    def tick() -> bool:
+        now[0] += 2
+        return False
+
+    report = scan(path, ScanOptions(chunk_size=1, timeout_seconds=1), cancelled=tick)
+    assert report.status == "timed_out"
+    assert report.results[0].classification == "UNKNOWN"
+    assert report.results[0].scan_status == "skipped"
+    assert report.results[0].error == "Scan timed out"
+    assert report.results[0].file["sha256"] is None
+
+
 def test_report_never_overwrites_or_follows_links(tmp_path: Path) -> None:
     target = tmp_path / "file"
     target.write_text("original")
@@ -144,6 +216,23 @@ def test_read_failure_is_reported(
     assert report.status == "partial"
     assert report.files_with_errors == 1
     assert "PermissionError" in str(report.results[0].error)
+
+
+def test_open_file_descriptor_is_closed_after_read_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "file"
+    target.write_text("hello")
+    opened: list[int] = []
+
+    def failed_read(fd: int, **kwargs: object) -> None:
+        opened.append(fd)
+        raise PermissionError("access denied")
+
+    monkeypatch.setattr(scanner, "process_file", failed_read)
+    assert scan(target).files_with_errors == 1
+    with pytest.raises(OSError):
+        os.fstat(opened[0])
 
 
 def test_platform_without_safe_access_fails_closed(

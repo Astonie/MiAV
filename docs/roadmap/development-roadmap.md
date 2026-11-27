@@ -23,3 +23,6 @@ claims about current performance.
 M1 remains the immediate development priority. Milestone numbers describe
 capability areas, not permission to ship an incomplete 0.1.0 scope; quarantine
 must meet its security gate before a release claims that capability.
+The Windows filesystem scanner remains blocked on a reviewed handle-relative
+design and real Windows validation; CI currently checks fail-closed behavior
+only. See the [assessment](../security/windows-scanner-assessment.md).

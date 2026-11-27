@@ -46,6 +46,9 @@ information and isolation will separate shared logic from Windows, Linux and
 macOS adapters. Unsupported capabilities must be reported explicitly, never
 represented as active protection. The present platform identifier identifies
 only the host OS; it does not establish a capability.
+The current scanner uses POSIX APIs directly; a Windows filesystem adapter is
+not yet implemented. See the [Windows assessment](../security/windows-scanner-assessment.md)
+for the proposed boundary and unresolved native security requirements.
 
 ## Management and dashboard
 
